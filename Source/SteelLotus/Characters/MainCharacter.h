@@ -38,6 +38,15 @@ protected:
 
 	/** Helper: attach weapon to correct socket */
 	void AttachWeaponToSocket(const FName SocketName);
+
+	UFUNCTION(BlueprintCallable, Category="Weapon")
+	void AttachWeaponToHand();
+
+	UFUNCTION(BlueprintCallable, Category="Weapon")
+	void AttachWeaponToSheath();
+
+	UFUNCTION(BlueprintCallable, Category="Weapon")
+	void OnEquipMontageEnded(UAnimMontage* Montage, bool bInterrupted);
 	
 public:
 	virtual void Tick(float DeltaTime) override;
@@ -74,7 +83,10 @@ protected:
 	UInputAction* ToggleWeaponAction;
 
 	UPROPERTY(BlueprintReadOnly)
-	bool bWeaponDrawn;
+	bool bWeaponDrawn = false;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Weapon")
+	bool bIsEquipping = false;
 
 	/** Socket names (set to match your skeleton sockets) */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Weapon")
@@ -82,4 +94,10 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Weapon")
 	FName KatanaSheathSocket = TEXT("Katana_Sheath");
+
+	UPROPERTY(EditDefaultsOnly, Category="Weapon|Anim")
+	UAnimMontage* DrawMontage = nullptr;
+
+	UPROPERTY(EditDefaultsOnly, Category="Weapon|Anim")
+	UAnimMontage* SheathMontage = nullptr;
 };

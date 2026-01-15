@@ -92,17 +92,23 @@ void AMainCharacter::AddInputMappingContext()
 
 void AMainCharacter::ToggleWeapon()
 {
-	bWeaponDrawn = !bWeaponDrawn;
+	if (bIsEquipping) return;
 
-	if (bWeaponDrawn)
-	{
-		AttachWeaponToSocket(KatanaHandSocket);
-	}
-	else
-	{
-		AttachWeaponToSocket(KatanaSheathSocket);
-	}
+	UAnimInstance* AnimInst = GetMesh() ? GetMesh()->GetAnimInstance() : nullptr;
+	if (!AnimInst) return;
+
+	UAnimMontage* MontageToPlay = bWeaponDrawn ? SheathMontage : DrawMontage;
+	if (!MontageToPlay) return;
+
+	bIsEquipping = true;
+
+	// Bind end callback once (safe to rebind: remove then add)
+	AnimInst->OnMontageEnded.RemoveDynamic(this, &AMainCharacter::OnEquipMontageEnded);
+	AnimInst->OnMontageEnded.AddDynamic(this, &AMainCharacter::OnEquipMontageEnded);
+
+	AnimInst->Montage_Play(MontageToPlay, 1.0f);
 }
+
 
 void AMainCharacter::AttachWeaponToSocket(const FName SocketName)
 {
@@ -113,6 +119,23 @@ void AMainCharacter::AttachWeaponToSocket(const FName SocketName)
 		FAttachmentTransformRules::SnapToTargetNotIncludingScale,
 		SocketName
 	);
+}
+
+void AMainCharacter::AttachWeaponToHand()
+{
+	AttachWeaponToSocket(KatanaHandSocket);
+	bWeaponDrawn = true;
+}
+
+void AMainCharacter::AttachWeaponToSheath()
+{
+	AttachWeaponToSocket(KatanaSheathSocket);
+	bWeaponDrawn = false;
+}
+
+void AMainCharacter::OnEquipMontageEnded(UAnimMontage* Montage, bool bInterrupted)
+{
+	bIsEquipping = false;
 }
 
 void AMainCharacter::Tick(float DeltaTime)
