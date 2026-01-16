@@ -10,6 +10,7 @@ class UInputAction;
 class USpringArmComponent;
 class UCameraComponent;
 class UStaticMeshComponent;
+class UTargetingComponent;
 
 UCLASS()
 class STEELLOTUS_API AMainCharacter : public ACharacter
@@ -31,6 +32,8 @@ protected:
 	
 	/** Adds the default input mapping context to the local player. */
     void AddInputMappingContext();
+
+	void LockOnPressed();
 
 	/** Toggle weapon draw/sheath */
 	UFUNCTION(BlueprintCallable, Category="Weapon")
@@ -69,6 +72,10 @@ protected:
     /** Default input mapping context for this character. */
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
 	UInputMappingContext* DefaultMappingContext;
+
+	/** Handles lock-on target selection / tracking. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components")
+	UTargetingComponent* TargetingComponent;
     
 	/** Move input action. */
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
@@ -81,6 +88,10 @@ protected:
 	/** Toggle weapon input action */
 	UPROPERTY(EditDefaultsOnly, Category="Input")
 	UInputAction* ToggleWeaponAction;
+
+	/** Lock-on input action. */
+	UPROPERTY(EditDefaultsOnly, Category="Input")
+	UInputAction* LockOnAction;
 
 	UPROPERTY(BlueprintReadOnly)
 	bool bWeaponDrawn = false;

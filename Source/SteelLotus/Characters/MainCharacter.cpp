@@ -8,6 +8,7 @@
 #include "Camera/CameraComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/SpringArmComponent.h"
+#include "SteelLotus/Components/TargetingComponent.h"
 
 // Sets default values
 AMainCharacter::AMainCharacter()
@@ -31,6 +32,8 @@ AMainCharacter::AMainCharacter()
 	KatanaMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("KatanaMesh"));
 	KatanaMesh->SetupAttachment(GetMesh()); // we will reattach to sockets at runtime
 	KatanaMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+
+	TargetingComponent = CreateDefaultSubobject<UTargetingComponent>(TEXT("TargetingComponent"));
 }
 
 void AMainCharacter::BeginPlay()
@@ -87,6 +90,14 @@ void AMainCharacter::AddInputMappingContext()
 				}
 			}
 		}
+	}
+}
+
+void AMainCharacter::LockOnPressed()
+{
+	if (TargetingComponent)
+	{
+		TargetingComponent->ToggleLockOn();
 	}
 }
 
@@ -163,6 +174,11 @@ void AMainCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompo
 		if (ToggleWeaponAction)
 		{
 			EnhancedInput->BindAction(ToggleWeaponAction, ETriggerEvent::Started, this, &AMainCharacter::ToggleWeapon);
+		}
+
+		if (LockOnAction)
+		{
+			EnhancedInput->BindAction(LockOnAction, ETriggerEvent::Started, this, &AMainCharacter::LockOnPressed);
 		}
 	}
 }
