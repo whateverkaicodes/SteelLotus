@@ -35,6 +35,10 @@ protected:
 
 	void LockOnPressed();
 
+	void ApplyLockOnMode(bool bEnable);
+
+	void UpdateLockOn(float DeltaTime);
+
 	/** Toggle weapon draw/sheath */
 	UFUNCTION(BlueprintCallable, Category="Weapon")
 	void ToggleWeapon();
@@ -98,6 +102,31 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Weapon")
 	bool bIsEquipping = false;
+
+	bool bPrevUseControllerRotationYaw = false;
+	
+	bool bPrevOrientRotationToMovement = true;
+
+	UPROPERTY(EditDefaultsOnly, Category="LockOn|Tuning")
+	float LockFaceInterpSpeed = 12.f;
+
+	UPROPERTY(EditDefaultsOnly, Category="LockOn|Tuning")
+	float MaxLockDistance = 1600.f;
+
+	UPROPERTY(EditDefaultsOnly, Category="LockOn|Camera")
+	float CameraAssistInterpSpeed = 8.f;
+
+	UPROPERTY(EditDefaultsOnly, Category="LockOn|Camera")
+	float MinLockPitch = -35.f;
+
+	UPROPERTY(EditDefaultsOnly, Category="LockOn|Camera")
+	float MaxLockPitch = 25.f;
+
+	UPROPERTY(EditDefaultsOnly, Category="LockOn|Camera")
+	float LockOnCameraInterpSpeed = 10.f;
+
+	UPROPERTY(EditDefaultsOnly, Category="LockOn|Camera")
+	float LockOnSnapAngleThreshold = 35.f;
 
 	/** Socket names (set to match your skeleton sockets) */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Weapon")

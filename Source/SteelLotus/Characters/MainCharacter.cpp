@@ -95,10 +95,129 @@ void AMainCharacter::AddInputMappingContext()
 
 void AMainCharacter::LockOnPressed()
 {
-	if (TargetingComponent)
+	if (!TargetingComponent) return;
+
+	TargetingComponent->ToggleLockOn();
+	ApplyLockOnMode(TargetingComponent->IsLockedOn());
+
+	// Snap instantly on the same frame
+	UpdateLockOn(0.f);
+}
+
+
+void AMainCharacter::ApplyLockOnMode(bool bEnable)
+{
+	UCharacterMovementComponent* MoveComp = GetCharacterMovement();
+	if (!MoveComp) return;
+
+	APlayerController* PC = Cast<APlayerController>(GetController());
+
+	if (bEnable)
 	{
-		TargetingComponent->ToggleLockOn();
+		// store previous settings
+		bPrevUseControllerRotationYaw = bUseControllerRotationYaw;
+		bPrevOrientRotationToMovement = MoveComp->bOrientRotationToMovement;
+
+		// Souls-like strafe mode
+		bUseControllerRotationYaw = true;
+		MoveComp->bOrientRotationToMovement = false;
+
+		// HARD LOCK: stop player look input
+		if (PC)
+		{
+			PC->SetIgnoreLookInput(true);
+		}
 	}
+	else
+	{
+		// revert
+		bUseControllerRotationYaw = bPrevUseControllerRotationYaw;
+		MoveComp->bOrientRotationToMovement = bPrevOrientRotationToMovement;
+
+		// restore look input
+		if (PC)
+		{
+			PC->SetIgnoreLookInput(false);
+		}
+	}
+}
+
+
+void AMainCharacter::UpdateLockOn(float DeltaTime)
+{
+	// Not locked -> nothing to do
+	if (!TargetingComponent || !TargetingComponent->IsLockedOn())
+	{
+		return;
+	}
+
+	AActor* Target = TargetingComponent->GetCurrentTarget();
+	if (!IsValid(Target))
+	{
+		TargetingComponent->ClearLockOn();
+		ApplyLockOnMode(false);
+		return;
+	}
+
+	const FVector TargetLoc = TargetingComponent->GetCurrentTargetLocation();
+	const FVector MyLoc = GetActorLocation();
+
+	// Auto-unlock by distance
+	const float MaxDistSq = FMath::Square(MaxLockDistance);
+	if (FVector::DistSquared(MyLoc, TargetLoc) > MaxDistSq)
+	{
+		TargetingComponent->ClearLockOn();
+		ApplyLockOnMode(false);
+		return;
+	}
+
+	// 1) Face target (Yaw only) - Souls-like
+	FVector ToTarget = (TargetLoc - MyLoc);
+	ToTarget.Z = 0.f;
+
+	if (!ToTarget.IsNearlyZero())
+	{
+		const FRotator DesiredYawRot(0.f, ToTarget.Rotation().Yaw, 0.f);
+		const FRotator NewRot = FMath::RInterpTo(GetActorRotation(), DesiredYawRot, DeltaTime, LockFaceInterpSpeed);
+		SetActorRotation(NewRot);
+	}
+
+	// 2) Smooth Souls-like camera: snap if far, otherwise smooth
+	if (APlayerController* PC = Cast<APlayerController>(GetController()))
+	{
+		FVector CamLoc;
+		FRotator CamRot;
+		PC->GetPlayerViewPoint(CamLoc, CamRot);
+
+		const FVector CamToTarget = (TargetLoc - CamLoc);
+		if (!CamToTarget.IsNearlyZero())
+		{
+			FRotator Desired = CamToTarget.Rotation();
+			Desired.Pitch = FMath::ClampAngle(Desired.Pitch, MinLockPitch, MaxLockPitch);
+			Desired.Roll = 0.f;
+
+			const FRotator Current = PC->GetControlRotation();
+
+			// Optional: one-time snap if it’s way off (feels better than slow spin)
+			const float AngleDelta = FMath::Abs(FRotator::NormalizeAxis(Desired.Yaw - Current.Yaw))
+								   + FMath::Abs(FRotator::NormalizeAxis(Desired.Pitch - Current.Pitch));
+
+			FRotator NewRot;
+			if (AngleDelta > LockOnSnapAngleThreshold)
+			{
+				NewRot = Desired; // snap
+			}
+			else
+			{
+				NewRot = FMath::RInterpTo(Current, Desired, DeltaTime, LockOnCameraInterpSpeed); // smooth
+			}
+
+			PC->SetControlRotation(NewRot);
+		}
+	}
+
+	// Optional debug (remove later)
+	// DrawDebugLine(GetWorld(), MyLoc + FVector(0,0,50), TargetLoc, FColor::Green, false, -1.f, 0, 1.5f);
 }
 
 void AMainCharacter::ToggleWeapon()
@@ -153,6 +272,7 @@ void AMainCharacter::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
+	UpdateLockOn(DeltaTime);
 }
 
 void AMainCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
