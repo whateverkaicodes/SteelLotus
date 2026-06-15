@@ -29,6 +29,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category="LockOn")
 	FVector GetCurrentTargetLocation() const;
 
+	UFUNCTION(BlueprintCallable, Category="LockOn")
+	bool SwitchTarget(bool bToRight);
+
 protected:
 	virtual void BeginPlay() override;
 
@@ -40,6 +43,8 @@ protected:
 
 	/** Scoring function (angle + distance) */
 	float ComputeScore(const FVector& CamLoc, const FVector& CamForward, const FVector& TargetLoc) const;
+
+	AActor* FindBestSwitchTarget(bool bToRight) const;
 
 protected:
 	UPROPERTY(EditDefaultsOnly, Category="LockOn|Config")

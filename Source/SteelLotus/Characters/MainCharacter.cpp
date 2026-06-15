@@ -69,11 +69,36 @@ void AMainCharacter::Move(const FInputActionValue& Value)
 void AMainCharacter::Look(const FInputActionValue& Value)
 {
 	const FVector2D LookAxis = Value.Get<FVector2D>();
-	//UE_LOG(LogTemp, Warning, TEXT("Look axis: %s"), *LookAxis.ToString());
 
+	// If locked-on, use mouse X as target switching input (no camera movement).
+	if (TargetingComponent && TargetingComponent->IsLockedOn())
+	{
+		// Accumulate yaw input as "flick" amount
+		LookYawAccum += LookAxis.X;
+
+		const float Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.f;
+		const bool bCanSwitch = (Now - LastSwitchTime) >= SwitchCooldown;
+
+		if (bCanSwitch && FMath::Abs(LookYawAccum) >= SwitchFlickThreshold)
+		{
+			const bool bToRight = LookYawAccum > 0.f;
+
+			// Switch in targeting component
+			TargetingComponent->SwitchTarget(bToRight);
+
+			// Reset and start cooldown
+			LastSwitchTime = Now;
+			LookYawAccum = 0.f;
+		}
+
+		return; // camera stays locked
+	}
+
+	// Normal free look when not locked
 	AddControllerYawInput(LookAxis.X);
 	AddControllerPitchInput(-LookAxis.Y);
 }
+
 
 void AMainCharacter::AddInputMappingContext()
 {
@@ -112,6 +137,8 @@ void AMainCharacter::ApplyLockOnMode(bool bEnable)
 
 	APlayerController* PC = Cast<APlayerController>(GetController());
 
+	LookYawAccum = 0.f;
+	
 	if (bEnable)
 	{
 		// store previous settings

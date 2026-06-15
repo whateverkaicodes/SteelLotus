@@ -127,6 +127,15 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, Category="LockOn|Camera")
 	float LockOnSnapAngleThreshold = 35.f;
+	
+	UPROPERTY(EditDefaultsOnly, Category="LockOn|Switch")
+	float SwitchFlickThreshold = 90.f;
+
+	UPROPERTY(EditDefaultsOnly, Category="LockOn|Switch")
+	float SwitchCooldown = 0.20f;
+
+	float LookYawAccum = 0.f;
+	float LastSwitchTime = -9999.f;
 
 	/** Socket names (set to match your skeleton sockets) */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Weapon")

@@ -50,6 +50,24 @@ FVector UTargetingComponent::GetCurrentTargetLocation() const
 	return Target->GetActorLocation();
 }
 
+bool UTargetingComponent::SwitchTarget(bool bToRight)
+{
+	if (!IsLockedOn())
+		return false;
+
+	AActor* NewTarget = FindBestSwitchTarget(bToRight);
+	if (!NewTarget)
+		return false;
+
+	CurrentTargetActor = NewTarget;
+
+	// Debug (optional)
+	DrawDebugSphere(GetWorld(), GetCurrentTargetLocation(), 12.f, 12, FColor::Yellow, false, 1.0f);
+
+	return true;
+}
+
+
 bool UTargetingComponent::AcquireBestTarget()
 {
 	AActor* Owner = GetOwner();
@@ -167,3 +185,97 @@ float UTargetingComponent::ComputeScore(const FVector& CamLoc, const FVector& Ca
 
 	return (AngleWeight * Dot) - (DistanceWeight * DistNorm);
 }
+
+AActor* UTargetingComponent::FindBestSwitchTarget(bool bToRight) const
+{
+	AActor* Owner = GetOwner();
+	AActor* Current = CurrentTargetActor.Get();
+	if (!Owner || !Current) return nullptr;
+
+	APlayerController* PC = Cast<APlayerController>(Cast<APawn>(Owner) ? Cast<APawn>(Owner)->GetController() : nullptr);
+	if (!PC) return nullptr;
+
+	// Get camera for LOS/angle scoring and screen projection
+	FVector CamLoc;
+	FRotator CamRot;
+	PC->GetPlayerViewPoint(CamLoc, CamRot);
+	const FVector CamForward = CamRot.Vector();
+
+	// Screen projection of current target (anchor)
+	FVector2D CurrentScreen;
+	const FVector CurrentLoc = GetCurrentTargetLocation();
+	if (!PC->ProjectWorldLocationToScreen(CurrentLoc, CurrentScreen))
+		return nullptr;
+
+	// Overlap candidates like AcquireBestTarget
+	TArray<FOverlapResult> Overlaps;
+	FCollisionQueryParams Params(SCENE_QUERY_STAT(LockOnSwitchOverlap), false, Owner);
+
+	const FVector Center = Owner->GetActorLocation();
+	const FCollisionShape Sphere = FCollisionShape::MakeSphere(SearchRadius);
+
+	const bool bHit = GetWorld()->OverlapMultiByObjectType(
+		Overlaps,
+		Center,
+		FQuat::Identity,
+		FCollisionObjectQueryParams(ECollisionChannel::ECC_Pawn),
+		Sphere,
+		Params
+	);
+
+	if (!bHit) return nullptr;
+
+	AActor* BestActor = nullptr;
+	float BestScore = FLT_MAX; // lower is better (closest on that side)
+
+	for (const FOverlapResult& Res : Overlaps)
+	{
+		AActor* Candidate = Res.GetActor();
+		if (!Candidate || Candidate == Owner || Candidate == Current) continue;
+
+		if (!Candidate->GetClass()->ImplementsInterface(ULockableTargetInterface::StaticClass()))
+			continue;
+
+		if (!ILockableTargetInterface::Execute_IsLockable(Candidate))
+			continue;
+
+		const FVector TargetLoc = ILockableTargetInterface::Execute_GetLockOnLocation(Candidate);
+
+		// Distance / cone / LOS filters (same philosophy as AcquireBestTarget)
+		const float Dist = FVector::Dist(CamLoc, TargetLoc);
+		if (Dist > MaxLockDistance) continue;
+
+		const float Dot = FVector::DotProduct(CamForward, (TargetLoc - CamLoc).GetSafeNormal());
+		const float MinDot = FMath::Cos(FMath::DegreesToRadians(MaxAngleDegrees));
+		if (Dot < MinDot) continue;
+
+		if (bRequireLineOfSight && !HasLineOfSightTo(Candidate, TargetLoc))
+			continue;
+
+		// Screen-space side check
+		FVector2D ScreenPos;
+		if (!PC->ProjectWorldLocationToScreen(TargetLoc, ScreenPos))
+			continue;
+
+		const float DeltaX = ScreenPos.X - CurrentScreen.X;
+
+		// Right means positive delta X, left means negative delta X
+		if (bToRight && DeltaX <= 0.f) continue;
+		if (!bToRight && DeltaX >= 0.f) continue;
+
+		// Score: pick the closest candidate on that side (prefer small delta X),
+		// and keep it near same vertical level to avoid weird jumps.
+		const float DeltaY = FMath::Abs(ScreenPos.Y - CurrentScreen.Y);
+
+		const float Score = FMath::Abs(DeltaX) + (0.25f * DeltaY);
+
+		if (Score < BestScore)
+		{
+			BestScore = Score;
+			BestActor = Candidate;
+		}
+	}
+
+	return BestActor;
+}
+
